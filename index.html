@@ -83,6 +83,9 @@
   <label for="filterLocation">Plats:</label>
   <select id="filterLocation" multiple onchange="filterTable()"></select>
 
+  <label for="filterStatus">Tillgångsstatus:</label>
+  <select id="filterStatus" multiple onchange="filterTable()"></select>
+
   <table id="contractTable">
     <thead>
       <tr>
@@ -93,6 +96,7 @@
         <th>Löptid (mån)</th>
         <th>Kvartalshyra</th>
         <th>Plats</th>
+        <th>Tillgångsstatus</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -108,6 +112,7 @@ const filterType = document.getElementById("filterType");
 const filterYear = document.getElementById("filterYear");
 const filterDuration = document.getElementById("filterDuration");
 const filterLocation = document.getElementById("filterLocation");
+const filterStatus = document.getElementById("filterStatus");
 const searchSerial = document.getElementById("searchSerial");
 const searchContract = document.getElementById("searchContract");
 const summaryDiv = document.getElementById("summary");
@@ -120,15 +125,16 @@ function loadExcel(event) {
     const sheetName = workbook.SheetNames.find(name => name.includes("Europa"));
     const sheet = workbook.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(sheet);
-    data = rows.map(row => [
-      row["SERIENUMMER"] || "",
-      row["Kontraktsnummer"] || "",
-      row["Tillgångsbeskrivning"] || "",
-      (row["Kontraktets förfallodatum"] instanceof Date && !isNaN(row["Kontraktets förfallodatum"])) ? row["Kontraktets förfallodatum"].toISOString().split('T')[0] : "",
-      row["Löptid"] || 0,
-      row["Hyra"] || 0,
-      row["Plats"] || ""
-    ]);
+      data = rows.map(row => [
+        row["SERIENUMMER"] || "",
+        row["Kontraktsnummer"] || "",
+        row["Tillgångsbeskrivning"] || "",
+        (row["Kontraktets förfallodatum"] instanceof Date && !isNaN(row["Kontraktets förfallodatum"])) ? row["Kontraktets förfallodatum"].toISOString().split('T')[0] : "",
+        row["Löptid"] || 0,
+        row["Hyra"] || 0,
+        row["Plats"] || "",
+        row["Tillgångsstatus"] || ""
+      ]);
     initFilters();
     filterTable();
   };
@@ -140,34 +146,39 @@ function initFilters() {
   filterYear.innerHTML = "";
   filterDuration.innerHTML = "";
   filterLocation.innerHTML = "";
+  filterStatus.innerHTML = "";
 
   const types = new Set();
   const years = new Set();
   const durations = new Set();
   const locations = new Set();
+  const statuses = new Set();
   data.forEach(row => {
     types.add(row[2]);
     years.add(new Date(row[3]).getFullYear());
     durations.add(row[4]);
     locations.add(row[6]);
+    statuses.add(row[7]);
   });
   [...types].sort().forEach(t => filterType.add(new Option(t, t)));
   [...years].sort().forEach(y => filterYear.add(new Option(y, y)));
   [...durations].sort((a, b) => a - b).forEach(d => filterDuration.add(new Option(d, d)));
   [...locations].sort().forEach(loc => filterLocation.add(new Option(loc, loc)));
+  [...statuses].sort().forEach(s => filterStatus.add(new Option(s, s)));
 }
 
 function getSelectedValues(selectEl) {
   return Array.from(selectEl.selectedOptions).map(option => option.value);
 }
 
-function filterTable() {
-  const types = getSelectedValues(filterType);
-  const years = getSelectedValues(filterYear);
-  const durations = getSelectedValues(filterDuration);
-  const locations = getSelectedValues(filterLocation);
-  const serialQuery = searchSerial.value.toLowerCase();
-  const contractQuery = searchContract.value.toLowerCase();
+  function filterTable() {
+    const types = getSelectedValues(filterType);
+    const years = getSelectedValues(filterYear);
+    const durations = getSelectedValues(filterDuration);
+    const locations = getSelectedValues(filterLocation);
+    const statuses = getSelectedValues(filterStatus);
+    const serialQuery = searchSerial.value.toLowerCase();
+    const contractQuery = searchContract.value.toLowerCase();
   let totalByYear = {};
 
   tableBody.innerHTML = "";
@@ -178,10 +189,11 @@ function filterTable() {
     const matchYear = years.length === 0 || years.includes(rowYear);
     const matchDuration = durations.length === 0 || durations.includes(row[4].toString());
     const matchLocation = locations.length === 0 || locations.includes(row[6]);
+    const matchStatus = statuses.length === 0 || statuses.includes(row[7]);
     const matchSerial = !serialQuery || row[0].toLowerCase().includes(serialQuery);
     const matchContract = !contractQuery || row[1].toLowerCase().includes(contractQuery);
 
-    if (matchType && matchYear && matchDuration && matchLocation && matchSerial && matchContract) {
+    if (matchType && matchYear && matchDuration && matchLocation && matchStatus && matchSerial && matchContract) {
       const tr = document.createElement("tr");
       row.forEach(cell => {
         const td = document.createElement("td");
