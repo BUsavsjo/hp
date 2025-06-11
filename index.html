@@ -2,37 +2,52 @@
 <html lang="sv">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Enhets- och kontraktsöversikt</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     body {
       font-family: 'Inter', sans-serif;
-      background: #f9fafb;
-      color: #111;
-      padding: 20px;
+      background: #f1f5f9;
+      color: #111827;
+      padding: 30px;
     }
     h2 {
       margin-bottom: 20px;
     }
-    label {
-      margin-right: 8px;
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 20px;
+      background: #fff;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .controls label {
+      margin-right: 6px;
+      font-weight: 600;
     }
     input, select {
       margin: 5px 10px 15px 0;
-      padding: 6px 10px;
-      border: 1px solid #ccc;
+      padding: 8px 10px;
+      border: 1px solid #d1d5db;
       border-radius: 6px;
       font-size: 14px;
     }
     select[multiple] {
-      height: 100px;
+      height: 120px;
     }
     table {
       width: 100%;
       border-collapse: collapse;
       background: white;
       box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      border-radius: 6px;
+      overflow: hidden;
     }
     th, td {
       border: 1px solid #e5e7eb;
@@ -47,6 +62,31 @@
     tr:nth-child(even) {
       background-color: #f9fafb;
     }
+    .table-container {
+      overflow-x: auto;
+    }
+    .instructions {
+      background: #fff;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .instructions img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+    @media (max-width: 600px) {
+      .controls label {
+        flex-basis: 100%;
+      }
+      input, select {
+        width: 100%;
+      }
+    }
     #summary {
       margin-top: 20px;
       font-weight: 600;
@@ -60,32 +100,38 @@
 <body>
   <h2>Sök och sortera enheter och kontrakt</h2>
 
-  <label for="uploadFile">Ladda upp .xlsx:</label>
-  <input type="file" id="uploadFile" accept=".xlsx" onchange="loadExcel(event)">
+  <div class="instructions">
+    <img id="instructionsImage" src="instructions.png" alt="Instruktionsbild">
+    <p>Ladda hem hp filen, se bild för urval. Ladda sedan upp filen här, filen hanteras säkert och renderas endast på din dator.</p>
+  </div>
 
-  <br><br>
+  <div class="controls">
+    <label for="uploadFile">Ladda upp .xlsx:</label>
+    <input type="file" id="uploadFile" accept=".xlsx" onchange="loadExcel(event)">
 
-  <label for="searchSerial">Sök serienummer:</label>
-  <input type="text" id="searchSerial" oninput="filterTable()">
+    <label for="searchSerial">Sök serienummer:</label>
+    <input type="text" id="searchSerial" oninput="filterTable()">
 
-  <label for="searchContract">Sök kontraktsnummer:</label>
-  <input type="text" id="searchContract" oninput="filterTable()">
+    <label for="searchContract">Sök kontraktsnummer:</label>
+    <input type="text" id="searchContract" oninput="filterTable()">
 
-  <label for="filterType">Produkt:</label>
-  <select id="filterType" multiple onchange="filterTable()"></select>
+    <label for="filterType">Produkt:</label>
+    <select id="filterType" multiple onchange="handleSelectChange(event); filterTable()"></select>
 
-  <label for="filterYear">Förfalloår:</label>
-  <select id="filterYear" multiple onchange="filterTable()"></select>
+    <label for="filterYear">Förfalloår:</label>
+    <select id="filterYear" multiple onchange="handleSelectChange(event); filterTable()"></select>
 
-  <label for="filterDuration">Löptid (mån):</label>
-  <select id="filterDuration" multiple onchange="filterTable()"></select>
+    <label for="filterDuration">Löptid (mån):</label>
+    <select id="filterDuration" multiple onchange="handleSelectChange(event); filterTable()"></select>
 
-  <label for="filterLocation">Plats:</label>
-  <select id="filterLocation" multiple onchange="filterTable()"></select>
+    <label for="filterLocation">Plats:</label>
+    <select id="filterLocation" multiple onchange="handleSelectChange(event); filterTable()"></select>
 
-  <label for="filterStatus">Tillgångsstatus:</label>
-  <select id="filterStatus" multiple onchange="filterTable()"></select>
+    <label for="filterStatus">Tillgångsstatus:</label>
+    <select id="filterStatus" multiple onchange="handleSelectChange(event); filterTable()"></select>
+  </div>
 
+  <div class="table-container">
   <table id="contractTable">
     <thead>
       <tr>
@@ -101,6 +147,7 @@
     </thead>
     <tbody></tbody>
   </table>
+  </div>
 
   <div id="summary"></div>
 
@@ -116,6 +163,22 @@ const filterStatus = document.getElementById("filterStatus");
 const searchSerial = document.getElementById("searchSerial");
 const searchContract = document.getElementById("searchContract");
 const summaryDiv = document.getElementById("summary");
+
+function addAllOption(selectEl) {
+  selectEl.add(new Option("Alla", "all"));
+}
+
+function handleSelectChange(event) {
+  const selectEl = event.target;
+  const allOption = selectEl.options[0];
+  const otherOptions = Array.from(selectEl.options).slice(1);
+
+  if (allOption.selected) {
+    otherOptions.forEach(opt => opt.selected = true);
+  }
+
+  allOption.selected = otherOptions.every(opt => opt.selected);
+}
 
 function loadExcel(event) {
   const file = event.target.files[0];
@@ -148,6 +211,8 @@ function initFilters() {
   filterLocation.innerHTML = "";
   filterStatus.innerHTML = "";
 
+  [filterType, filterYear, filterDuration, filterLocation, filterStatus].forEach(addAllOption);
+
   const types = new Set();
   const years = new Set();
   const durations = new Set();
@@ -165,10 +230,15 @@ function initFilters() {
   [...durations].sort((a, b) => a - b).forEach(d => filterDuration.add(new Option(d, d)));
   [...locations].sort().forEach(loc => filterLocation.add(new Option(loc, loc)));
   [...statuses].sort().forEach(s => filterStatus.add(new Option(s, s)));
+
+  [filterType, filterYear, filterDuration, filterLocation, filterStatus].forEach(select => {
+    Array.from(select.options).forEach(opt => opt.selected = true);
+  });
 }
 
 function getSelectedValues(selectEl) {
-  return Array.from(selectEl.selectedOptions).map(option => option.value);
+  const values = Array.from(selectEl.selectedOptions).map(option => option.value);
+  return values.includes("all") ? [] : values.filter(v => v !== "all");
 }
 
   function filterTable() {
