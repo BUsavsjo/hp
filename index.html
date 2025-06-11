@@ -102,7 +102,7 @@
 
   <div class="instructions">
     <img id="instructionsImage" src="instructions.png" alt="Instruktionsbild">
-    <p>Ladda hem hp filen, se bild för urval. Ladda sedan upp filen här, filen hanteras säkert och renderas endast på din dator.</p>
+    <p>Ladda hem hp-filen, se bild för urval. Ladda sedan upp filen här – filen hanteras säkert och renderas endast på din dator.</p>
   </div>
 
   <div class="controls">
@@ -132,156 +132,148 @@
   </div>
 
   <div class="table-container">
-  <table id="contractTable">
-    <thead>
-      <tr>
-        <th>Serienummer</th>
-        <th>Kontraktsnummer</th>
-        <th>Tillgång</th>
-        <th>Förfallodatum</th>
-        <th>Löptid (mån)</th>
-        <th>Kvartalshyra</th>
-        <th>Plats</th>
-        <th>Tillgångsstatus</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+    <table id="contractTable">
+      <thead>
+        <tr>
+          <th>Serienummer</th>
+          <th>Kontraktsnummer</th>
+          <th>Tillgång</th>
+          <th>Förfallodatum</th>
+          <th>Löptid (mån)</th>
+          <th>Kvartalshyra</th>
+          <th>Plats</th>
+          <th>Tillgångsstatus</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
   </div>
 
   <div id="summary"></div>
 
-<script>
-let data = [];
+  <script>
+    let data = [];
 
-const tableBody = document.querySelector("#contractTable tbody");
-const filterType = document.getElementById("filterType");
-const filterYear = document.getElementById("filterYear");
-const filterDuration = document.getElementById("filterDuration");
-const filterLocation = document.getElementById("filterLocation");
-const filterStatus = document.getElementById("filterStatus");
-const searchSerial = document.getElementById("searchSerial");
-const searchContract = document.getElementById("searchContract");
-const summaryDiv = document.getElementById("summary");
+    const tableBody = document.querySelector("#contractTable tbody");
+    const filterType = document.getElementById("filterType");
+    const filterYear = document.getElementById("filterYear");
+    const filterDuration = document.getElementById("filterDuration");
+    const filterLocation = document.getElementById("filterLocation");
+    const filterStatus = document.getElementById("filterStatus");
+    const searchSerial = document.getElementById("searchSerial");
+    const searchContract = document.getElementById("searchContract");
+    const summaryDiv = document.getElementById("summary");
 
-function addAllOption(selectEl) {
-  selectEl.add(new Option("Alla", "all"));
-}
-
-function handleSelectChange(event) {
-  const selectEl = event.target;
-  const allOption = selectEl.options[0];
-  const otherOptions = Array.from(selectEl.options).slice(1);
-
-  if (allOption.selected) {
-    otherOptions.forEach(opt => opt.selected = true);
-  }
-
-  allOption.selected = otherOptions.every(opt => opt.selected);
-}
-
-function loadExcel(event) {
-  const file = event.target.files[0];
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const workbook = XLSX.read(e.target.result, { type: "binary", cellDates: true }); // Added cellDates: true
-    const sheetName = workbook.SheetNames.find(name => name.includes("Europa"));
-    const sheet = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json(sheet);
-      data = rows.map(row => [
-        row["SERIENUMMER"] || "",
-        row["Kontraktsnummer"] || "",
-        row["Tillgångsbeskrivning"] || "",
-        (row["Kontraktets förfallodatum"] instanceof Date && !isNaN(row["Kontraktets förfallodatum"])) ? row["Kontraktets förfallodatum"].toISOString().split('T')[0] : "",
-        row["Löptid"] || 0,
-        row["Hyra"] || 0,
-        row["Plats"] || "",
-        row["Tillgångsstatus"] || ""
-      ]);
-    initFilters();
-    filterTable();
-  };
-  reader.readAsBinaryString(file);
-}
-
-function initFilters() {
-  filterType.innerHTML = "";
-  filterYear.innerHTML = "";
-  filterDuration.innerHTML = "";
-  filterLocation.innerHTML = "";
-  filterStatus.innerHTML = "";
-
-  [filterType, filterYear, filterDuration, filterLocation, filterStatus].forEach(addAllOption);
-
-  const types = new Set();
-  const years = new Set();
-  const durations = new Set();
-  const locations = new Set();
-  const statuses = new Set();
-  data.forEach(row => {
-    types.add(row[2]);
-    years.add(new Date(row[3]).getFullYear());
-    durations.add(row[4]);
-    locations.add(row[6]);
-    statuses.add(row[7]);
-  });
-  [...types].sort().forEach(t => filterType.add(new Option(t, t)));
-  [...years].sort().forEach(y => filterYear.add(new Option(y, y)));
-  [...durations].sort((a, b) => a - b).forEach(d => filterDuration.add(new Option(d, d)));
-  [...locations].sort().forEach(loc => filterLocation.add(new Option(loc, loc)));
-  [...statuses].sort().forEach(s => filterStatus.add(new Option(s, s)));
-
-  [filterType, filterYear, filterDuration, filterLocation, filterStatus].forEach(select => {
-    Array.from(select.options).forEach(opt => opt.selected = true);
-  });
-}
-
-function getSelectedValues(selectEl) {
-  const values = Array.from(selectEl.selectedOptions).map(option => option.value);
-  return values.includes("all") ? [] : values.filter(v => v !== "all");
-}
-
-  function filterTable() {
-    const types = getSelectedValues(filterType);
-    const years = getSelectedValues(filterYear);
-    const durations = getSelectedValues(filterDuration);
-    const locations = getSelectedValues(filterLocation);
-    const statuses = getSelectedValues(filterStatus);
-    const serialQuery = searchSerial.value.toLowerCase();
-    const contractQuery = searchContract.value.toLowerCase();
-  let totalByYear = {};
-
-  tableBody.innerHTML = "";
-
-  data.forEach(row => {
-    const rowYear = new Date(row[3]).getFullYear().toString();
-    const matchType = types.length === 0 || types.includes(row[2]);
-    const matchYear = years.length === 0 || years.includes(rowYear);
-    const matchDuration = durations.length === 0 || durations.includes(row[4].toString());
-    const matchLocation = locations.length === 0 || locations.includes(row[6]);
-    const matchStatus = statuses.length === 0 || statuses.includes(row[7]);
-    const matchSerial = !serialQuery || row[0].toLowerCase().includes(serialQuery);
-    const matchContract = !contractQuery || row[1].toLowerCase().includes(contractQuery);
-
-    if (matchType && matchYear && matchDuration && matchLocation && matchStatus && matchSerial && matchContract) {
-      const tr = document.createElement("tr");
-      row.forEach(cell => {
-        const td = document.createElement("td");
-        td.textContent = cell;
-        tr.appendChild(td);
-      });
-      tableBody.appendChild(tr);
-
-      totalByYear[rowYear] = (totalByYear[rowYear] || 0) + row[5] * 4;
+    function addAllOption(selectEl) {
+      selectEl.add(new Option("Alla", "all"));
     }
-  });
 
-  let summaryText = "Totalkostnad per år:";
-  for (let y in totalByYear) {
-    summaryText += `\n${y}: ${totalByYear[y].toFixed(2)} kr`;
-  }
-  summaryDiv.textContent = summaryText;
-}
-</script>
+    function handleSelectChange(event) {
+      const selectEl = event.target;
+      const allOption = selectEl.options[0];
+      const otherOptions = Array.from(selectEl.options).slice(1);
+
+      if (allOption.selected) {
+        otherOptions.forEach(opt => opt.selected = true);
+      }
+
+      allOption.selected = otherOptions.every(opt => opt.selected);
+    }
+
+    function loadExcel(event) {
+      const file = event.target.files[0];
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const workbook = XLSX.read(e.target.result, { type: "binary", cellDates: true });
+        const sheetName = workbook.SheetNames.find(name => name.includes("Europa"));
+        const sheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet);
+        data = rows.map(row => [
+          row["SERIENUMMER"] || "",
+          row["Kontraktsnummer"] || "",
+          row["Tillgångsbeskrivning"] || "",
+          (row["Kontraktets förfallodatum"] instanceof Date && !isNaN(row["Kontraktets förfallodatum"])) ? row["Kontraktets förfallodatum"].toISOString().split('T')[0] : "",
+          row["Löptid"] || 0,
+          row["Hyra"] || 0,
+          row["Plats"] || "",
+          row["Tillgångsstatus"] || ""
+        ]);
+        initFilters();
+        filterTable();
+      };
+      reader.readAsBinaryString(file);
+    }
+
+    function initFilters() {
+      [filterType, filterYear, filterDuration, filterLocation, filterStatus].forEach(select => select.innerHTML = "");
+      [filterType, filterYear, filterDuration, filterLocation, filterStatus].forEach(addAllOption);
+
+      const types = new Set(), years = new Set(), durations = new Set(), locations = new Set(), statuses = new Set();
+
+      data.forEach(row => {
+        types.add(row[2]);
+        years.add(new Date(row[3]).getFullYear());
+        durations.add(row[4]);
+        locations.add(row[6]);
+        statuses.add(row[7]);
+      });
+
+      [...types].sort().forEach(t => filterType.add(new Option(t, t)));
+      [...years].sort().forEach(y => filterYear.add(new Option(y, y)));
+      [...durations].sort((a, b) => a - b).forEach(d => filterDuration.add(new Option(d, d)));
+      [...locations].sort().forEach(loc => filterLocation.add(new Option(loc, loc)));
+      [...statuses].sort().forEach(s => filterStatus.add(new Option(s, s)));
+
+      [filterType, filterYear, filterDuration, filterLocation, filterStatus].forEach(select =>
+        Array.from(select.options).forEach(opt => opt.selected = true)
+      );
+    }
+
+    function getSelectedValues(selectEl) {
+      const values = Array.from(selectEl.selectedOptions).map(option => option.value);
+      return values.includes("all") ? [] : values.filter(v => v !== "all");
+    }
+
+    function filterTable() {
+      const types = getSelectedValues(filterType);
+      const years = getSelectedValues(filterYear);
+      const durations = getSelectedValues(filterDuration);
+      const locations = getSelectedValues(filterLocation);
+      const statuses = getSelectedValues(filterStatus);
+      const serialQuery = searchSerial.value.toLowerCase();
+      const contractQuery = searchContract.value.toLowerCase();
+      let totalByYear = {};
+
+      tableBody.innerHTML = "";
+
+      data.forEach(row => {
+        const rowYear = new Date(row[3]).getFullYear().toString();
+        const matchType = types.length === 0 || types.includes(row[2]);
+        const matchYear = years.length === 0 || years.includes(rowYear);
+        const matchDuration = durations.length === 0 || durations.includes(row[4].toString());
+        const matchLocation = locations.length === 0 || locations.includes(row[6]);
+        const matchStatus = statuses.length === 0 || statuses.includes(row[7]);
+        const matchSerial = !serialQuery || row[0].toLowerCase().includes(serialQuery);
+        const matchContract = !contractQuery || row[1].toLowerCase().includes(contractQuery);
+
+        if (matchType && matchYear && matchDuration && matchLocation && matchStatus && matchSerial && matchContract) {
+          const tr = document.createElement("tr");
+          row.forEach(cell => {
+            const td = document.createElement("td");
+            td.textContent = cell;
+            tr.appendChild(td);
+          });
+          tableBody.appendChild(tr);
+          totalByYear[rowYear] = (totalByYear[rowYear] || 0) + row[5] * 4;
+        }
+      });
+
+      let summaryText = "Totalkostnad per år:";
+      for (let y in totalByYear) {
+        summaryText += `\n${y}: ${totalByYear[y].toFixed(2)} kr`;
+      }
+      summaryDiv.textContent = summaryText;
+    }
+  </script>
 </body>
 </html>
