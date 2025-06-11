@@ -74,10 +74,15 @@
       text-align: center;
     }
     .instructions img {
-      max-width: 100%;
+      width: 120px;
       height: auto;
       border-radius: 4px;
       margin-bottom: 10px;
+      transition: transform 0.2s ease-in-out;
+    }
+    .instructions img:hover {
+      transform: scale(2);
+      z-index: 1;
     }
     @media (max-width: 600px) {
       .controls label {
@@ -101,7 +106,7 @@
   <h2>Sök och sortera enheter och kontrakt</h2>
 
   <div class="instructions">
-    <img id="instructionsImage" src="hpbild.png" alt="Instruktionsbild" style="max-width: 50%; height: auto;>
+    <img id="instructionsImage" src="hpbild.png" alt="Instruktionsbild">
     <p>Ladda hem hp-filen, se bild för urval. Ladda sedan upp filen här – filen hanteras säkert och renderas endast på din dator.</p>
   </div>
 
