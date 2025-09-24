@@ -184,13 +184,43 @@ function handleSelectChange(event) {
   allOption.selected = otherOptions.every(opt => opt.selected);
 }
 
+function parseQuarterlyCost(value) {
+  if (typeof value === "number") {
+    return value;
+  }
+
+  if (value === null || value === undefined) {
+    return NaN;
+  }
+
+  let normalized = String(value).trim().replace(/\skr/gi, "");
+  if (!normalized) {
+    return NaN;
+  }
+
+  normalized = normalized.replace(/[^0-9,.-]/g, "");
+  if (normalized.includes(",")) {
+    normalized = normalized.replace(/\./g, "");
+    normalized = normalized.replace(/,/g, ".");
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
 function distributeQuarterlyCostPerYear(startDate, endDate, quarterlyCost) {
   const result = {};
   const start = new Date(startDate);
   const end = new Date(endDate);
+  const quarterly = parseQuarterlyCost(quarterlyCost);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || Number.isNaN(quarterly) || start > end) {
+    return result;
+  }
+
+  const monthlyCost = quarterly / 3;
   const startYear = start.getFullYear();
   const endYear = end.getFullYear();
-  const monthlyCost = quarterlyCost / 3;
 
   for (let year = startYear; year <= endYear; year++) {
     const yearStart = new Date(year, 0, 1);
@@ -223,7 +253,7 @@ function loadExcel(event) {
       row["Tillgångsbeskrivning"] || "",
       (row["Kontraktets förfallodatum"] instanceof Date) ? row["Kontraktets förfallodatum"] : new Date(row["Kontraktets förfallodatum"]),
       row["Löptid"] || 0,
-      row["Hyra"] || 0,
+      parseQuarterlyCost(row["Hyra"]) || 0,
       row["Plats"] || "",
       row["Tillgångsstatus"] || "",
       (row["StartDatum"] instanceof Date) ? row["StartDatum"] : new Date(row["StartDatum"])
@@ -303,9 +333,22 @@ function filterTable() {
     }
   });
 
+  const displayYears = years.length ? years : Object.keys(totalByYear);
+  const sortedYears = Array.from(new Set(displayYears))
+    .map(year => year.toString())
+    .filter(year => year !== "" && !Number.isNaN(parseInt(year, 10)))
+    .sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+
   let summaryText = "Totalkostnad per år:";
-  for (let y of Object.keys(totalByYear).sort()) {
-    summaryText += `\n${y}: ${totalByYear[y].toFixed(2)} kr`;
+
+  if (sortedYears.length === 0) {
+    summaryDiv.textContent = summaryText + "\nInga valda avtal.";
+    return;
+  }
+
+  for (let y of sortedYears) {
+    const amount = totalByYear[y] || 0;
+    summaryText += `\n${y}: ${amount.toLocaleString("sv-SE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr`;
   }
   summaryDiv.textContent = summaryText;
 }
