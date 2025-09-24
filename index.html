@@ -144,6 +144,10 @@
       <input type="checkbox" id="filterElementary" onchange="filterTable()">
       Grundskola
     </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="filterLeisure" onchange="filterTable()">
+      Fritidshem
+    </label>
   </div>
 
   <div class="table-container">
@@ -177,6 +181,7 @@ const filterLocation = document.getElementById("filterLocation");
 const filterStatus = document.getElementById("filterStatus");
 const filterPreschool = document.getElementById("filterPreschool");
 const filterElementary = document.getElementById("filterElementary");
+const filterLeisure = document.getElementById("filterLeisure");
 const searchSerial = document.getElementById("searchSerial");
 const searchContract = document.getElementById("searchContract");
 const summaryDiv = document.getElementById("summary");
@@ -243,6 +248,21 @@ const elementarySchoolSearchTerms = [
   "46150",
   "46160",
   "46550"
+];
+
+const leisureCenterSearchTerms = [
+  "stockaryd fritidshem — 46230",
+  "rörvik fritidshem — 46330",
+  "vrigstad fritidshem — 46430",
+  "hägne fritidshem — 46130",
+  "stockaryd fritidshem",
+  "rörvik fritidshem",
+  "vrigstad fritidshem",
+  "hägne fritidshem",
+  "46230",
+  "46330",
+  "46430",
+  "46130"
 ];
 
 function addAllOption(selectEl) {
@@ -461,6 +481,7 @@ function filterTable() {
   const statuses = getSelectedValues(filterStatus);
   const requirePreschool = filterPreschool.checked;
   const requireElementary = filterElementary.checked;
+  const requireLeisure = filterLeisure.checked;
   const serialQuery = searchSerial.value.toLowerCase();
   const contractQuery = searchContract.value.toLowerCase();
   let totalByYear = {};
@@ -476,6 +497,7 @@ function filterTable() {
     const matchContract = !contractQuery || row[1].toLowerCase().includes(contractQuery);
     const matchPreschool = !requirePreschool || preschoolSearchTerms.some(term => row[6].toLowerCase().includes(term));
     const matchElementary = !requireElementary || elementarySchoolSearchTerms.some(term => row[6].toLowerCase().includes(term));
+    const matchLeisure = !requireLeisure || leisureCenterSearchTerms.some(term => row[6].toLowerCase().includes(term));
 
     if (
       matchType &&
@@ -486,13 +508,14 @@ function filterTable() {
       matchSerial &&
       matchContract &&
       matchPreschool &&
-      matchElementary
+      matchElementary &&
+      matchLeisure
     ) {
       matchedRows.push(row);
     }
   });
 
-  if (requirePreschool || requireElementary) {
+  if (requirePreschool || requireElementary || requireLeisure) {
     matchedRows.sort((a, b) => a[6].localeCompare(b[6], "sv"));
   }
 
