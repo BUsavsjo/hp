@@ -245,29 +245,85 @@ function parseQuarterlyCost(value) {
   return Number.isFinite(parsed) ? parsed : NaN;
 }
 
-function distributeQuarterlyCostPerYear(startDate, endDate, quarterlyCost) {
+function parseDurationMonths(value) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const match = trimmed.match(/-?\d+(?:[.,]\d+)?/);
+    if (match) {
+      const parsed = Number(match[0].replace(",", "."));
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+  }
+
+  return null;
+}
+
+function getDaysInMonth(year, month) {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+function parseDateValue(value) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function shiftMonths(date, months) {
+  const base = new Date(date.getFullYear(), date.getMonth(), 1);
+  base.setMonth(base.getMonth() + months);
+  const day = Math.min(date.getDate(), getDaysInMonth(base.getFullYear(), base.getMonth()));
+  base.setDate(day);
+  return base;
+}
+
+function distributeQuarterlyCostPerYear(startDate, endDate, quarterlyCost, durationMonths) {
   const result = {};
   const quarterly = parseQuarterlyCost(quarterlyCost);
 
-  if (!Number.isFinite(quarterly)) {
+  if (!Number.isFinite(quarterly) || quarterly === 0) {
     return result;
   }
 
-  let start = new Date(startDate);
-  let end = new Date(endDate);
+  const monthlyCost = quarterly / 3;
+  const parsedDuration = Number(durationMonths);
+  const duration = Number.isFinite(parsedDuration) ? Math.round(parsedDuration) : NaN;
+  const hasDuration = Number.isFinite(duration) && duration > 0;
 
-  const hasValidStart = !Number.isNaN(start.getTime());
-  const hasValidEnd = !Number.isNaN(end.getTime());
+  let start = parseDateValue(startDate);
+  let end = parseDateValue(endDate);
 
-  if (!hasValidStart && !hasValidEnd) {
+  if (!start && end && hasDuration) {
+    start = shiftMonths(end, -(duration - 1));
+  } else if (start && !end && hasDuration) {
+    end = shiftMonths(start, duration - 1);
+  }
+
+  if (!start && !end) {
     return result;
   }
 
-  if (!hasValidStart || !hasValidEnd) {
-    const fallbackDate = hasValidStart ? start : end;
-    const fallbackYear = fallbackDate.getFullYear();
-    if (!Number.isNaN(fallbackYear)) {
-      result[fallbackYear] = (result[fallbackYear] || 0) + quarterly * 4;
+  if (!start || !end) {
+    const knownDate = start || end;
+    if (!hasDuration || !knownDate) {
+      return result;
+    }
+
+    const current = new Date(knownDate.getFullYear(), knownDate.getMonth(), 1);
+    for (let i = 0; i < duration; i++) {
+      const year = current.getFullYear();
+      result[year] = (result[year] || 0) + monthlyCost;
+      current.setMonth(current.getMonth() + 1);
     }
     return result;
   }
@@ -278,28 +334,13 @@ function distributeQuarterlyCostPerYear(startDate, endDate, quarterlyCost) {
     end = temp;
   }
 
-  const monthlyCost = quarterly / 3;
-  const startYear = start.getFullYear();
-  const endYear = end.getFullYear();
+  const current = new Date(start.getFullYear(), start.getMonth(), 1);
+  const lastMonth = new Date(end.getFullYear(), end.getMonth(), 1);
 
-  for (let year = startYear; year <= endYear; year++) {
-    const yearStart = new Date(year, 0, 1);
-    const yearEnd = new Date(year, 11, 31);
-    const from = start > yearStart ? start : yearStart;
-    const to = end < yearEnd ? end : yearEnd;
-    const months =
-      (to.getFullYear() - from.getFullYear()) * 12 +
-      (to.getMonth() - from.getMonth()) + 1;
-    if (months > 0) {
-      result[year] = (result[year] || 0) + months * monthlyCost;
-    }
-  }
-
-  if (Object.keys(result).length === 0) {
-    const fallbackYear = start.getFullYear();
-    if (!Number.isNaN(fallbackYear)) {
-      result[fallbackYear] = (result[fallbackYear] || 0) + quarterly * 4;
-    }
+  while (current <= lastMonth) {
+    const year = current.getFullYear();
+    result[year] = (result[year] || 0) + monthlyCost;
+    current.setMonth(current.getMonth() + 1);
   }
 
   return result;
@@ -314,17 +355,28 @@ function loadExcel(event) {
     const sheet = workbook.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(sheet);
 
-    data = rows.map(row => [
-      row["SERIENUMMER"] || "",
-      row["Kontraktsnummer"] || "",
-      row["Tillgångsbeskrivning"] || "",
-      (row["Kontraktets förfallodatum"] instanceof Date) ? row["Kontraktets förfallodatum"] : new Date(row["Kontraktets förfallodatum"]),
-      row["Löptid"] || 0,
-      parseQuarterlyCost(row["Hyra"]) || 0,
-      row["Plats"] || "",
-      row["Tillgångsstatus"] || "",
-      (row["StartDatum"] instanceof Date) ? row["StartDatum"] : new Date(row["StartDatum"])
-    ]);
+    data = rows.map(row => {
+      const durationValue = (() => {
+        const primary = parseDurationMonths(row["Löptid"]);
+        if (primary !== null) {
+          return primary;
+        }
+        const secondary = parseDurationMonths(row["Löptid (mån)"]);
+        return secondary !== null ? secondary : 0;
+      })();
+
+      return [
+        row["SERIENUMMER"] || "",
+        row["Kontraktsnummer"] || "",
+        row["Tillgångsbeskrivning"] || "",
+        (row["Kontraktets förfallodatum"] instanceof Date) ? row["Kontraktets förfallodatum"] : new Date(row["Kontraktets förfallodatum"]),
+        durationValue,
+        parseQuarterlyCost(row["Hyra"]) || 0,
+        row["Plats"] || "",
+        row["Tillgångsstatus"] || "",
+        (row["Startdatum"] instanceof Date) ? row["Startdatum"] : new Date(row["Startdatum"])
+      ];
+    });
 
     initFilters();
     filterTable();
@@ -405,7 +457,7 @@ function filterTable() {
     });
     tableBody.appendChild(tr);
 
-    const yearSplit = distributeQuarterlyCostPerYear(row[8], row[3], row[5]);
+    const yearSplit = distributeQuarterlyCostPerYear(row[8], row[3], row[5], row[4]);
     Object.entries(yearSplit).forEach(([year, amount]) => {
       if (!Number.isFinite(amount)) {
         return;
