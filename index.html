@@ -210,12 +210,35 @@ function parseQuarterlyCost(value) {
 
 function distributeQuarterlyCostPerYear(startDate, endDate, quarterlyCost) {
   const result = {};
-  const start = new Date(startDate);
-  const end = new Date(endDate);
   const quarterly = parseQuarterlyCost(quarterlyCost);
 
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || Number.isNaN(quarterly) || start > end) {
+  if (!Number.isFinite(quarterly)) {
     return result;
+  }
+
+  let start = new Date(startDate);
+  let end = new Date(endDate);
+
+  const hasValidStart = !Number.isNaN(start.getTime());
+  const hasValidEnd = !Number.isNaN(end.getTime());
+
+  if (!hasValidStart && !hasValidEnd) {
+    return result;
+  }
+
+  if (!hasValidStart || !hasValidEnd) {
+    const fallbackDate = hasValidStart ? start : end;
+    const fallbackYear = fallbackDate.getFullYear();
+    if (!Number.isNaN(fallbackYear)) {
+      result[fallbackYear] = (result[fallbackYear] || 0) + quarterly * 4;
+    }
+    return result;
+  }
+
+  if (start > end) {
+    const temp = start;
+    start = end;
+    end = temp;
   }
 
   const monthlyCost = quarterly / 3;
@@ -232,6 +255,13 @@ function distributeQuarterlyCostPerYear(startDate, endDate, quarterlyCost) {
       (to.getMonth() - from.getMonth()) + 1;
     if (months > 0) {
       result[year] = (result[year] || 0) + months * monthlyCost;
+    }
+  }
+
+  if (Object.keys(result).length === 0) {
+    const fallbackYear = start.getFullYear();
+    if (!Number.isNaN(fallbackYear)) {
+      result[fallbackYear] = (result[fallbackYear] || 0) + quarterly * 4;
     }
   }
 
@@ -305,6 +335,7 @@ function filterTable() {
   const serialQuery = searchSerial.value.toLowerCase();
   const contractQuery = searchContract.value.toLowerCase();
   let totalByYear = {};
+  let matchCount = 0;
 
   tableBody.innerHTML = "";
 
@@ -318,6 +349,7 @@ function filterTable() {
     const matchContract = !contractQuery || row[1].toLowerCase().includes(contractQuery);
 
     if (matchType && matchYear && matchDuration && matchLocation && matchStatus && matchSerial && matchContract) {
+      matchCount++;
       const tr = document.createElement("tr");
       row.slice(0, 8).forEach(cell => {
         const td = document.createElement("td");
@@ -327,22 +359,29 @@ function filterTable() {
       tableBody.appendChild(tr);
 
       const yearSplit = distributeQuarterlyCostPerYear(row[8], row[3], row[5]);
-      for (let y in yearSplit) {
-        totalByYear[y] = (totalByYear[y] || 0) + yearSplit[y];
-      }
+      Object.entries(yearSplit).forEach(([year, amount]) => {
+        if (!Number.isFinite(amount)) {
+          return;
+        }
+        totalByYear[year] = (totalByYear[year] || 0) + amount;
+      });
     }
   });
 
-  const displayYears = years.length ? years : Object.keys(totalByYear);
-  const sortedYears = Array.from(new Set(displayYears))
+  let summaryText = "Totalkostnad per år:";
+
+  if (matchCount === 0) {
+    summaryDiv.textContent = summaryText + "\nInga valda avtal.";
+    return;
+  }
+
+  const sortedYears = Object.keys(totalByYear)
     .map(year => year.toString())
     .filter(year => year !== "" && !Number.isNaN(parseInt(year, 10)))
     .sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
 
-  let summaryText = "Totalkostnad per år:";
-
   if (sortedYears.length === 0) {
-    summaryDiv.textContent = summaryText + "\nInga valda avtal.";
+    summaryDiv.textContent = summaryText + "\nIngen kostnadsinformation tillgänglig för urvalet.";
     return;
   }
 
