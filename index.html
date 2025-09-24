@@ -140,6 +140,10 @@
       <input type="checkbox" id="filterPreschool" onchange="filterTable()">
       Förskola
     </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="filterElementary" onchange="filterTable()">
+      Grundskola
+    </label>
   </div>
 
   <div class="table-container">
@@ -172,6 +176,7 @@ const filterDuration = document.getElementById("filterDuration");
 const filterLocation = document.getElementById("filterLocation");
 const filterStatus = document.getElementById("filterStatus");
 const filterPreschool = document.getElementById("filterPreschool");
+const filterElementary = document.getElementById("filterElementary");
 const searchSerial = document.getElementById("searchSerial");
 const searchContract = document.getElementById("searchContract");
 const summaryDiv = document.getElementById("summary");
@@ -205,6 +210,39 @@ const preschoolSearchTerms = [
   "41140",
   "46210",
   "46310"
+];
+
+const elementarySchoolSearchTerms = [
+  "hofgård — 6302",
+  "vallsjöskolan — 6308",
+  "hägneskolan — 6301",
+  "stockaryds skola — 6306",
+  "vrigstad skola — 6310",
+  "stockaryd grundskola — 46250",
+  "rörvik grundskola — 46350",
+  "hägne grundskola — 46150",
+  "hägne anpassad grundskola — 46160",
+  "hofgård grundskola — 46550",
+  "hofgård",
+  "vallsjöskolan",
+  "hägneskolan",
+  "stockaryds skola",
+  "vrigstad skola",
+  "stockaryd grundskola",
+  "rörvik grundskola",
+  "hägne grundskola",
+  "hägne anpassad grundskola",
+  "hofgård grundskola",
+  "6302",
+  "6308",
+  "6301",
+  "6306",
+  "6310",
+  "46250",
+  "46350",
+  "46150",
+  "46160",
+  "46550"
 ];
 
 function addAllOption(selectEl) {
@@ -422,6 +460,7 @@ function filterTable() {
   const locations = getSelectedValues(filterLocation);
   const statuses = getSelectedValues(filterStatus);
   const requirePreschool = filterPreschool.checked;
+  const requireElementary = filterElementary.checked;
   const serialQuery = searchSerial.value.toLowerCase();
   const contractQuery = searchContract.value.toLowerCase();
   let totalByYear = {};
@@ -436,13 +475,24 @@ function filterTable() {
     const matchSerial = !serialQuery || row[0].toLowerCase().includes(serialQuery);
     const matchContract = !contractQuery || row[1].toLowerCase().includes(contractQuery);
     const matchPreschool = !requirePreschool || preschoolSearchTerms.some(term => row[6].toLowerCase().includes(term));
+    const matchElementary = !requireElementary || elementarySchoolSearchTerms.some(term => row[6].toLowerCase().includes(term));
 
-    if (matchType && matchYear && matchDuration && matchLocation && matchStatus && matchSerial && matchContract && matchPreschool) {
+    if (
+      matchType &&
+      matchYear &&
+      matchDuration &&
+      matchLocation &&
+      matchStatus &&
+      matchSerial &&
+      matchContract &&
+      matchPreschool &&
+      matchElementary
+    ) {
       matchedRows.push(row);
     }
   });
 
-  if (requirePreschool) {
+  if (requirePreschool || requireElementary) {
     matchedRows.sort((a, b) => a[6].localeCompare(b[6], "sv"));
   }
 
