@@ -135,6 +135,11 @@
 
     <label for="filterStatus">Tillgångsstatus:</label>
     <select id="filterStatus" multiple onchange="handleSelectChange(event); filterTable()"></select>
+
+    <label class="checkbox-label">
+      <input type="checkbox" id="filterPreschool" onchange="filterTable()">
+      Förskola
+    </label>
   </div>
 
   <div class="table-container">
@@ -166,9 +171,41 @@ const filterYear = document.getElementById("filterYear");
 const filterDuration = document.getElementById("filterDuration");
 const filterLocation = document.getElementById("filterLocation");
 const filterStatus = document.getElementById("filterStatus");
+const filterPreschool = document.getElementById("filterPreschool");
 const searchSerial = document.getElementById("searchSerial");
 const searchContract = document.getElementById("searchContract");
 const summaryDiv = document.getElementById("summary");
+
+const preschoolSearchTerms = [
+  "förskoleområde 1 i sävsjö",
+  "förskoleområde 2 i sävsjö",
+  "förskoleområde vrigstad",
+  "förskolan snickaregården rörvik",
+  "förskolan appelhagen stockaryd",
+  "spången förskola",
+  "sörgården förskola",
+  "fantasia förskola",
+  "ripan förskola",
+  "paletten förskola",
+  "prästhagen förskola",
+  "tuvan förskola",
+  "appelhagen förskola",
+  "snickaregården förskola",
+  "6312",
+  "6314",
+  "6309",
+  "6305",
+  "6306",
+  "41030",
+  "41060",
+  "41070",
+  "41080",
+  "41120",
+  "41130",
+  "41140",
+  "46210",
+  "46310"
+];
 
 function addAllOption(selectEl) {
   selectEl.add(new Option("Alla", "all"));
@@ -332,12 +369,11 @@ function filterTable() {
   const durations = getSelectedValues(filterDuration);
   const locations = getSelectedValues(filterLocation);
   const statuses = getSelectedValues(filterStatus);
+  const requirePreschool = filterPreschool.checked;
   const serialQuery = searchSerial.value.toLowerCase();
   const contractQuery = searchContract.value.toLowerCase();
   let totalByYear = {};
-  let matchCount = 0;
-
-  tableBody.innerHTML = "";
+  const matchedRows = [];
 
   data.forEach(row => {
     const matchType = types.length === 0 || types.includes(row[2]);
@@ -347,30 +383,40 @@ function filterTable() {
     const matchStatus = statuses.length === 0 || statuses.includes(row[7]);
     const matchSerial = !serialQuery || row[0].toLowerCase().includes(serialQuery);
     const matchContract = !contractQuery || row[1].toLowerCase().includes(contractQuery);
+    const matchPreschool = !requirePreschool || preschoolSearchTerms.some(term => row[6].toLowerCase().includes(term));
 
-    if (matchType && matchYear && matchDuration && matchLocation && matchStatus && matchSerial && matchContract) {
-      matchCount++;
-      const tr = document.createElement("tr");
-      row.slice(0, 8).forEach(cell => {
-        const td = document.createElement("td");
-        td.textContent = cell;
-        tr.appendChild(td);
-      });
-      tableBody.appendChild(tr);
-
-      const yearSplit = distributeQuarterlyCostPerYear(row[8], row[3], row[5]);
-      Object.entries(yearSplit).forEach(([year, amount]) => {
-        if (!Number.isFinite(amount)) {
-          return;
-        }
-        totalByYear[year] = (totalByYear[year] || 0) + amount;
-      });
+    if (matchType && matchYear && matchDuration && matchLocation && matchStatus && matchSerial && matchContract && matchPreschool) {
+      matchedRows.push(row);
     }
+  });
+
+  if (requirePreschool) {
+    matchedRows.sort((a, b) => a[6].localeCompare(b[6], "sv"));
+  }
+
+  tableBody.innerHTML = "";
+
+  matchedRows.forEach(row => {
+    const tr = document.createElement("tr");
+    row.slice(0, 8).forEach(cell => {
+      const td = document.createElement("td");
+      td.textContent = cell;
+      tr.appendChild(td);
+    });
+    tableBody.appendChild(tr);
+
+    const yearSplit = distributeQuarterlyCostPerYear(row[8], row[3], row[5]);
+    Object.entries(yearSplit).forEach(([year, amount]) => {
+      if (!Number.isFinite(amount)) {
+        return;
+      }
+      totalByYear[year] = (totalByYear[year] || 0) + amount;
+    });
   });
 
   let summaryText = "Totalkostnad per år:";
 
-  if (matchCount === 0) {
+  if (matchedRows.length === 0) {
     summaryDiv.textContent = summaryText + "\nInga valda avtal.";
     return;
   }
